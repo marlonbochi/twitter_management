@@ -10,6 +10,7 @@ import (
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
+	"github.com/joho/godotenv"
 )
 
 // HomePage renders the HTML form from the template file
@@ -67,6 +68,12 @@ func DeleteTweet(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file: %s", err)
+	}
 	// Route for the homepage
 	http.HandleFunc("/", HomePage)
 
