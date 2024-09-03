@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,11 +10,32 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+
+	"golang.org/x/oauth2"
 )
 
 const (
 	twitterAPIBaseURL = "https://api.x.com/2"
 )
+
+var (
+	websiteURL   = "http://localhost:81"
+	clientID     = os.Getenv("TWITTER_CONSUMER_KEY")
+	clientSecret = os.Getenv("TWITTER_CONSUMER_SECRET")
+	redirectURL  = websiteURL + "/callback"
+	oauthState   = "random_state_string" // Protect against CSRF
+)
+
+var oauthConfig = &oauth2.Config{
+	ClientID:     clientID,
+	ClientSecret: clientSecret,
+	RedirectURL:  redirectURL,
+	Scopes:       []string{"tweet.read", "tweet.write", "users.read"}, // Adjust scopes as necessary
+	Endpoint: oauth2.Endpoint{
+		AuthURL:  "https://twitter.com/i/oauth2/authorize",
+		TokenURL: twitterAPIBaseURL + "/oauth2/token",
+	},
+}
 
 // Tweet represents the structure of a tweet
 type Tweet struct {
@@ -195,6 +217,34 @@ func getUserID(username string) (string, error) {
 	return userResp.Data.ID, nil
 }
 
+// Handle the OAuth login route
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	url := oauthConfig.AuthCodeURL(oauthState)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+// Handle the OAuth callback from Twitter
+func handleCallback(w http.ResponseWriter, r *http.Request) {
+	// Verify the state string
+	if r.FormValue("state") != oauthState {
+		log.Println("Invalid OAuth state")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Exchange the OAuth code for an access token
+	code := r.FormValue("code")
+	token, err := oauthConfig.Exchange(context.Background(), code)
+	if err != nil {
+		log.Printf("Failed to exchange code for token: %s", err.Error())
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Use the access token to make requests to the Twitter API
+	fmt.Fprintf(w, "Access Token: %s\n", token.AccessToken)
+}
+
 func main() {
 
 	err := godotenv.Load()
@@ -208,7 +258,11 @@ func main() {
 	// Route for deleting a tweet
 	http.HandleFunc("/delete", deleteTweetHandler)
 
-	// Start the web server on port 8080
-	log.Println("Server started at http://localhost:81")
+	// Route for deleting a tweet
+	http.HandleFunc("/login", handleLogin)
+	http.HandleFunc("/callback", handleCallback)
+
+	// Start the web server on port 81
+	log.Println("Server started at " + websiteURL)
 	log.Fatal(http.ListenAndServe(":81", nil))
 }

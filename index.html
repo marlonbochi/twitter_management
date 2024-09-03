@@ -9,6 +9,11 @@
 <body>
     <h1>Twitter Management</h1>
 
+	<h3>Twitter OAuth 2.0 Login</h3>
+	<form action="/login" method="post">
+		<input type="submit" value="Login with Twitter">
+	</form>
+
     <h2>Your Recent Tweets</h2>
     <ul>
         {{range .Tweets}}
